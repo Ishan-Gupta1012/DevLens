@@ -1,0 +1,25 @@
+{
+  "name": "devlens",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@google/genai": "^2.31.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "autoprefixer": "^10.6.1",
+    "gsap": "^3.15.0",
+    "lucide-react": "^1.61.0",
+    "next": "^14.2.35",
+    "postcss": "^8.5.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "reactflow": "^11.11.4",
+    "tailwindcss": "^4.3.3"
+  }
+}
