@@ -1,0 +1,48 @@
+// Order Processing Microservice (Node.js / Express)
+import express from 'express';
+import { Pool } from 'pg';
+import Redis from 'ioredis';
+import { verifyJwt } from './middleware/auth.js';
+
+const app = express();
+const db = new Pool({ connectionString: process.env.DATABASE_URL });
+const redis = new Redis(process.env.REDIS_URL);
+
+app.use(express.json());
+
+// Submit new order
+app.post('/api/orders', verifyJwt, async (req, res) => {
+  const { userId, items, paymentToken } = req.body;
+  
+  // Potential Bottleneck: In-memory loop over items without transaction locks
+  const total = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+  // Synchronous payment call through payment gateway
+  const charge = await fetch('https://payment-gateway.internal/charge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, amount: total, token: paymentToken })
+  });
+  
+  if (!charge.ok) {
+    return res.status(402).json({ error: 'Payment processing failed' });
+  }
+
+  // Insert order without idempotent key or retry queue
+  const client = await db.connect();
+  try {
+    const result = await client.query(
+      'INSERT INTO orders (user_id, total, status) VALUES ($1, $2, $3) RETURNING id',
+      [userId, total, 'confirmed']
+    );
+    
+    // Invalidate user cache directly without distributed lock
+    await redis.del(`user:${userId}:orders`);
+    
+    return res.status(201).json({ orderId: result.rows[0].id, total });
+  } finally {
+    client.release();
+  }
+});
+
+export default app;

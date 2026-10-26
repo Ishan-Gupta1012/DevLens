@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    { "id": "client", "position": { "x": 0, "y": 0 }, "data": { "label": "Web Client", "type": "client" } },
+    { "id": "gateway", "position": { "x": 0, "y": 0 }, "data": { "label": "API Gateway", "type": "api" } },
+    { "id": "auth", "position": { "x": 0, "y": 0 }, "data": { "label": "Auth Service (JWT)", "type": "auth" } },
+    { "id": "order-service", "position": { "x": 0, "y": 0 }, "data": { "label": "Order Service", "type": "api" } },
+    { "id": "cache", "position": { "x": 0, "y": 0 }, "data": { "label": "Redis Cache Cluster", "type": "cache" } },
+    { "id": "queue", "position": { "x": 0, "y": 0 }, "data": { "label": "Order Processing Queue", "type": "queue" } },
+    { "id": "database", "position": { "x": 0, "y": 0 }, "data": { "label": "PostgreSQL Primary DB", "type": "db" } },
+    { "id": "payment", "position": { "x": 0, "y": 0 }, "data": { "label": "External Payment Gateway", "type": "external" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "client", "target": "gateway", "label": "HTTPS REST" },
+    { "id": "e2", "source": "gateway", "target": "auth", "label": "JWT Verify" },
+    { "id": "e3", "source": "gateway", "target": "order-service", "label": "Proxy /api/orders" },
+    { "id": "e4", "source": "order-service", "target": "payment", "label": "Sync HTTP Charge" },
+    { "id": "e5", "source": "order-service", "target": "queue", "label": "Async Order Events" },
+    { "id": "e6", "source": "order-service", "target": "cache", "label": "Cache Invalidation" },
+    { "id": "e7", "source": "order-service", "target": "database", "label": "SQL Insert" }
+  ],
+  "readme": "# E-Commerce Order Processing Architecture\n\n## Overview\nThis service handles customer order checkout, authenticating incoming requests via an API Gateway, coordinating real-time payment capture through a 3rd-party provider, persisting the state to PostgreSQL, and maintaining fresh session caches in Redis.\n\n```typescript\ninterface OrderPayload {\n  userId: string;\n  items: { productId: string; quantity: number; price: number }[];\n  paymentToken: string;\n}\n```\n\n## Data Flow\n1. **Client Request**: End-user dispatches an HTTPS POST request with credentials and selected cart items.\n2. **Gateway & Auth**: The API Gateway intercepts headers and performs cryptographic validation via the Auth Service.\n3. **Order Lifecycle**: The order service computes item totals and triggers credit card processing synchronously before writing records.\n4. **Persistence & Caching**: PostgreSQL retains the durable transaction row; Redis drops stale queries.\n\n## Key Architectural Characteristics\n- **Decoupled Gateway**: Single point of ingress protecting backend services from denial-of-service spikes.\n- **Read-Through Cache**: Decreases repetitive read volume from relational storage.\n- **Event Dispatching**: Background tasks pushed to queue for invoicing, notifications, and inventory allocation.",
+  "bottlenecks": [
+    {
+      "id": "b1",
+      "title": "Synchronous Payment Gateway HTTP Latency",
+      "severity": "high",
+      "nodeId": "payment",
+      "fix": "Decouple synchronous HTTP calls. Implement an asynchronous transaction pattern with idempotent webhooks and fallback job retries."
+    },
+    {
+      "id": "b2",
+      "title": "Unbounded Cache Deletion Race Conditions",
+      "severity": "medium",
+      "nodeId": "cache",
+      "fix": "Implement a distributed lock (Redlock) or lease-based cache pattern to avoid stale read-write overwrites during spikes."
+    },
+    {
+      "id": "b3",
+      "title": "Missing Distributed Transaction Safety",
+      "severity": "medium",
+      "nodeId": "order-service",
+      "fix": "Wrap multi-table order row creations in transactional blocks (`BEGIN ... COMMIT`) with explicit isolation levels."
+    },
+    {
+      "id": "b4",
+      "title": "Database Connection Pool Exhaustion Risk",
+      "severity": "low",
+      "nodeId": "database",
+      "fix": "Introduce an intermediate database proxy like PgBouncer to buffer connection surges."
+    }
+  ]
+}
