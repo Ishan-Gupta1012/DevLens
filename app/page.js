@@ -56,6 +56,21 @@ export default function Home() {
           className="border-2 border-dashed border-teal-500 rounded-lg p-8 text-center mb-4"
         >
           {image ? "Image loaded" : "Drag & drop architecture diagram"}
+          <div className="mt-3">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = () => setImage(reader.result.split(",")[1]);
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="text-sm"
+            />
+          </div>
         </div>
         <textarea
           value={code}
